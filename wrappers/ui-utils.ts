@@ -1,6 +1,7 @@
 import { sleep, NetworkProvider, UIProvider} from '@ton/blueprint';
 import { Address, beginCell, Builder, Cell, Dictionary, DictionaryValue, Slice } from "@ton/core";
 import { sha256 } from 'ton-crypto';
+import { TonClient4, TonClient } from '@ton/ton';
 
 export const defaultJettonKeys = ["uri", "name", "description", "image", "image_data", "symbol", "decimals", "amount_style"];
 export const defaultNftKeys    = ["uri", "name", "description", "image", "image_data"];
@@ -49,14 +50,12 @@ export const promptAmount = async (prompt:string, provider:UIProvider) => {
     } while(true);
 }
 
-export const getLastBlock = async (provider: NetworkProvider) => {
-    return (await provider.api().provider()).last.seqno;
-}
 export const getAccountLastTx = async (provider: NetworkProvider, address: Address) => {
-    const res = await provider.api().getAccountLite(await getLastBlock(provider), address);
-    if(res.account.last == null)
+    const tonClient = provider.api() as TonClient;
+    const res = await tonClient.getContractState(address);
+    if(res.state !== "active" || res.code == null)
         throw(Error("Contract is not active"));
-    return res.account.last.lt;
+    return res.lastTransaction?.lt;
 }
 export const waitForTransaction = async (provider:NetworkProvider, address:Address, curTx:string | null, maxRetry:number, interval:number=1000) => {
     let done  = false;
@@ -64,13 +63,11 @@ export const waitForTransaction = async (provider:NetworkProvider, address:Addre
     const ui  = provider.ui();
 
     do {
-        const lastBlock = await getLastBlock(provider);
         ui.write(`Awaiting transaction completion (${++count}/${maxRetry})`);
         await sleep(interval);
-        const curState = await provider.api().getAccountLite(lastBlock, address);
-        if(curState.account.last !== null){
-            done = curState.account.last.lt !== curTx;
-        }
+        
+        const lastTx = await getAccountLastTx(provider, address);
+        done = lastTx !== curTx;
     } while(!done && count < maxRetry);
     return done;
 }

@@ -1,13 +1,12 @@
 import { Address, beginCell, Cell, fromNano, OpenedContract, toNano } from '@ton/core';
 import { compile, sleep, NetworkProvider, UIProvider} from '@ton/blueprint';
+import { TonClient } from '@ton/ton';
 import { JettonMinter } from '../wrappers/JettonMinter';
 import { promptBool, promptAmount, promptAddress, displayContentCell, waitForTransaction } from '../wrappers/ui-utils';
 let minterContract:OpenedContract<JettonMinter>;
 
 const adminActions  = ['Mint', 'Change admin'];
 const userActions   = ['Info', 'Quit'];
-
-
 
 const failedTransMessage = (ui:UIProvider) => {
     ui.write("Failed to get indication of transaction completion from API!\nCheck result manually, or try again\n");
@@ -25,6 +24,7 @@ const infoAction = async (provider:NetworkProvider, ui:UIProvider) => {
         displayContentCell(jettonData.content, ui);
     }
 };
+
 const changeAdminAction = async(provider:NetworkProvider, ui:UIProvider) => {
     let retry:boolean;
     let newAdmin:Address;
@@ -42,7 +42,7 @@ const changeAdminAction = async(provider:NetworkProvider, ui:UIProvider) => {
         }
     } while(retry);
 
-    const curState = await provider.api().getContractState(minterContract.address);
+    const curState = await (provider.api() as TonClient).getContractState(minterContract.address);
     if(curState.lastTransaction === null)
         throw("Last transaction can't be null on deployed contract");
 
@@ -83,7 +83,7 @@ const mintAction = async (provider:NetworkProvider, ui:UIProvider) => {
     ui.write(`Minting ${mintAmount} to ${mintAddress}\n`);
     const supplyBefore = await minterContract.getTotalSupply();
     const nanoMint     = toNano(mintAmount);
-    const curState     = await provider.api().getContractState(minterContract.address);
+    const curState     = await (provider.api() as TonClient).getContractState(minterContract.address);
 
     if(curState.lastTransaction === null)
         throw("Last transaction can't be null on deployed contract");
@@ -125,7 +125,7 @@ export async function run(provider: NetworkProvider) {
     do {
         retry = false;
         minterAddress = await promptAddress('Please enter minter address:', ui);
-        const contractState = await api.getContractState(minterAddress);
+        const contractState = await (api as TonClient).getContractState(minterAddress);
         if(contractState.state !== "active" || contractState.code == null) {
             retry = true;
             ui.write("This contract is not active!\nPlease use another address, or deploy it firs");

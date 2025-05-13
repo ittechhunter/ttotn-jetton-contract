@@ -47,11 +47,13 @@ export async function run(provider: NetworkProvider) {
 
     const wallet_code = await compile('JettonWallet');
 
-    const minter  = JettonMinter.createFromConfig({admin,
+    const minter  = provider.open(JettonMinter.createFromConfig({admin,
                                                   content,
                                                   wallet_code,
                                                   }, 
-                                                  await compile('JettonMinter'));
+                                                  await compile('JettonMinter')));
 
-    await provider.deploy(minter, toNano('0.05'));
+    await minter.sendDeploy(provider.sender(), toNano('0.05'));
+    await provider.waitForDeploy(minter.address);
+    console.log("Jetton Minter Address: ", minter.address);
 }
