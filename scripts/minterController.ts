@@ -1,11 +1,11 @@
 import { Address, beginCell, Cell, fromNano, OpenedContract, toNano } from '@ton/core';
 import { compile, sleep, NetworkProvider, UIProvider} from '@ton/blueprint';
 import { TonClient } from '@ton/ton';
-import { JettonMinter } from '../wrappers/JettonMinter';
-import { promptBool, promptAmount, promptAddress, displayContentCell, waitForTransaction } from '../wrappers/ui-utils';
+import { JettonMinter, jettonContentToCell } from '../wrappers/JettonMinter';
+import { promptBool, promptAmount, promptAddress, promptUrl, displayContentCell, waitForTransaction } from '../wrappers/ui-utils';
 let minterContract:OpenedContract<JettonMinter>;
 
-const adminActions  = ['Mint', 'Change admin'];
+const adminActions  = ['Mint', 'Change admin', 'Change content'];
 const userActions   = ['Info', 'Quit'];
 
 const failedTransMessage = (ui:UIProvider) => {
@@ -58,6 +58,47 @@ const changeAdminAction = async(provider:NetworkProvider, ui:UIProvider) => {
         }
         else {
             ui.write("Admin address hasn't changed!\nSomething went wrong!\n");
+        }
+    }
+    else {
+            }
+};
+
+const changeContentAction = async(provider:NetworkProvider, ui:UIProvider) => {
+    let retry:boolean;
+    let newContentUrl:string;
+    let newContent: Cell;
+    let curContent = await minterContract.getContent();
+    do {
+        retry = false;
+        newContentUrl = await promptUrl('Please specify new url pointing to jetton metadata(json):', ui);
+        newContent = jettonContentToCell({type:1,uri:newContentUrl});
+        if(newContent.equals(curContent)) {
+            retry = true;
+            ui.write("Content url specified matched current content url!\nPlease pick another one.\n");
+        }
+        else {
+            ui.write(`New content url is going to be:${newContentUrl}\nKindly double check it!\n`);
+            retry = !(await promptBool('Is it ok?(yes/no)', ['yes', 'no'], ui));
+        }
+    } while(retry);
+
+    const curState = await (provider.api() as TonClient).getContractState(minterContract.address);
+    if(curState.lastTransaction === null)
+        throw("Last transaction can't be null on deployed contract");
+
+    await minterContract.sendChangeContent(provider.sender(), newContent);
+    const transDone = await waitForTransaction(provider,
+                                               minterContract.address,
+                                               curState.lastTransaction.lt,
+                                               10);
+    if(transDone) {
+        const contentAfter = await minterContract.getContent();
+        if(contentAfter.equals(newContent)){
+            ui.write("Content changed successfully");
+        }
+        else {
+            ui.write("Content url hasn't changed!\nSomething went wrong!\n");
         }
     }
     else {
@@ -160,6 +201,9 @@ export async function run(provider: NetworkProvider) {
                 break;
             case 'Change admin':
                 await changeAdminAction(provider, ui);
+                break;
+            case 'Change content':
+                await changeContentAction(provider, ui);
                 break;
             case 'Info':
                 await infoAction(provider, ui);
