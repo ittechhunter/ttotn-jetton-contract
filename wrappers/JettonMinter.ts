@@ -7,11 +7,12 @@ export type JettonMinterContent = {
     uri:string
 };
 
-export type JettonMinterConfig = {admin: Address; content: Cell; wallet_code: Cell};
+export type JettonMinterConfig = {max_supply: string; admin: Address; content: Cell; wallet_code: Cell};
 
 export function jettonMinterConfigToCell(config: JettonMinterConfig): Cell {
     return beginCell()
                       .storeCoins(0)
+                      .storeCoins(toNano(config.max_supply))
                       .storeAddress(config.admin)
                       .storeRef(config.content)
                       .storeRef(config.wallet_code)

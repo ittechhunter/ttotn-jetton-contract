@@ -1,7 +1,7 @@
 {
-    "name": "Sample Jetton",
-    "description": "Sample of Jetton",
-    "symbol": "JTN",
-    "decimals": 0,
+    "name": "TestTokenOnTon",
+    "description": "This is a test token on the TON network",
+    "symbol": "TTOTN",
+    "decimals": 9,
     "image": "https://www.svgrepo.com/download/483336/coin-vector.svg"
 }

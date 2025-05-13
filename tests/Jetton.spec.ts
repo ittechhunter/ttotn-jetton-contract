@@ -21,6 +21,7 @@ import { Op, Errors } from '../wrappers/JettonConstants';
 
 let fwd_fee = 1804014n, gas_consumption = 15000000n, min_tons_for_storage = 10000000n;
 //let fwd_fee = 1804014n, gas_consumption = 14000000n, min_tons_for_storage = 10000000n;
+const maxSupply = '1000000000';
 
 describe('Jetton', () => {
     let jwallet_code = new Cell();
@@ -42,6 +43,7 @@ describe('Jetton', () => {
         jettonMinter   = blockchain.openContract(
                    JettonMinter.createFromConfig(
                      {
+                       max_supply: maxSupply,
                        admin: deployer.address,
                        content: defaultContent,
                        wallet_code: jwallet_code,
@@ -99,6 +101,23 @@ describe('Jetton', () => {
         const notDeployerJettonWallet = await userWallet(notDeployer.address);
         expect(await notDeployerJettonWallet.getJettonBalance()).toEqual(otherJettonBalance);
         expect(await jettonMinter.getTotalSupply()).toEqual(initialTotalSupply + otherJettonBalance);
+    });
+
+    // implementation detail
+    it('minter admin should not be able to mint too much jettons', async () => {
+        let initialTotalSupply = await jettonMinter.getTotalSupply();
+        const deployerJettonWallet = await userWallet(deployer.address);
+        let initialJettonBalance = await deployerJettonWallet.getJettonBalance();
+        const notMintableResult = await jettonMinter.sendMint(deployer.getSender(), deployer.address, toNano(maxSupply + '1111'), toNano('0.05'), toNano('1'));
+
+        expect(notMintableResult.transactions).toHaveTransaction({
+            from: deployer.address,
+            to: jettonMinter.address,
+            aborted: true,
+            exitCode: Errors.not_mintable, // error::not_mintable
+        });
+        expect(await deployerJettonWallet.getJettonBalance()).toEqual(initialJettonBalance);
+        expect(await jettonMinter.getTotalSupply()).toEqual(initialTotalSupply);
     });
 
     // implementation detail
@@ -232,36 +251,6 @@ describe('Jetton', () => {
         });
         expect(await deployerJettonWallet.getJettonBalance()).toEqual(initialJettonBalance);
         expect(await notDeployerJettonWallet.getJettonBalance()).toEqual(initialJettonBalance2);
-    });
-
-    it.skip('malformed forward payload', async() => {
-
-        const deployerJettonWallet    = await userWallet(deployer.address);
-        const notDeployerJettonWallet = await userWallet(notDeployer.address);
-
-        let sentAmount     = toNano('0.5');
-        let forwardAmount  = getRandomTon(0.01, 0.05); // toNano('0.05');
-        let forwardPayload = beginCell().storeUint(0x1234567890abcdefn, 128).endCell();
-        let msgPayload     = beginCell().storeUint(0xf8a7ea5, 32).storeUint(0, 64) // op, queryId
-                                        .storeCoins(sentAmount).storeAddress(notDeployer.address)
-                                        .storeAddress(deployer.address)
-                                        .storeMaybeRef(null)
-                                        .storeCoins(toNano('0.05')) // No forward payload indication
-                            .endCell();
-        const res = await blockchain.sendMessage(internal({
-                                                    from: deployer.address,
-                                                    to: deployerJettonWallet.address,
-                                                    body: msgPayload,
-                                                    value: toNano('0.2')
-                                                    }));
-
-
-        expect(res.transactions).toHaveTransaction({
-            from: deployer.address,
-            to: deployerJettonWallet.address,
-            aborted: true,
-            exitCode: 708
-        });
     });
 
     it('correctly sends forward_payload', async () => {

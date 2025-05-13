@@ -1,7 +1,7 @@
 import { Address, toNano } from '@ton/core';
 import { JettonMinter, JettonMinterContent, jettonContentToCell, jettonMinterConfigToCell } from '../wrappers/JettonMinter';
 import { compile, NetworkProvider, UIProvider} from '@ton/blueprint';
-import { promptAddress, promptBool, promptUrl } from '../wrappers/ui-utils';
+import { promptAmount, promptAddress, promptBool, promptUrl } from '../wrappers/ui-utils';
 
 const formatUrl = "https://github.com/ton-blockchain/TEPs/blob/master/text/0064-token-data-standard.md#jetton-metadata-example-offchain";
 const exampleContent = {
@@ -16,17 +16,22 @@ const urlPrompt = 'Please specify url pointing to jetton metadata(json):';
 export async function run(provider: NetworkProvider) {
     const ui       = provider.ui();
     const sender   = provider.sender();
+
+    const maxSupplyPrompt = `Please specify max supply`;
+    const maxSupply = await promptAmount(maxSupplyPrompt, ui);
+
     const adminPrompt = `Please specify admin address`;
     ui.write(`Jetton deployer\nCurrent deployer onli supports off-chain format:${formatUrl}`);
-
     let admin      = await promptAddress(adminPrompt, ui, sender.address);
     ui.write(`Admin address:${admin}\n`);
+
     let contentUrl = await promptUrl(urlPrompt, ui);
     ui.write(`Jetton content url:${contentUrl}`);
 
     let dataCorrect = false;
     do {
         ui.write("Please verify data:\n")
+        ui.write(`MaxSupply:${maxSupply}\n\n`);
         ui.write(`Admin:${admin}\n\n`);
         ui.write('Metadata url:' + contentUrl);
         dataCorrect = await promptBool('Is everything ok?(y/n)', ['y','n'], ui);
@@ -47,7 +52,8 @@ export async function run(provider: NetworkProvider) {
 
     const wallet_code = await compile('JettonWallet');
 
-    const minter  = provider.open(JettonMinter.createFromConfig({admin,
+    const minter  = provider.open(JettonMinter.createFromConfig({max_supply: maxSupply,
+                                                  admin,
                                                   content,
                                                   wallet_code,
                                                   }, 

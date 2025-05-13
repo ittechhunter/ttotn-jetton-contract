@@ -18,6 +18,7 @@ export abstract class Errors {
     static not_admin  = 73;
     static unouthorized_burn = 74;
     static discovery_fee_not_matched = 75;
+    static not_mintable = 76;
     static wrong_op = 0xffff;
     static not_owner = 705;
     static not_enough_ton = 709;
